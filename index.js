@@ -37,21 +37,18 @@ async function run() {
 
         /// available items
         app.get('/available', async (req, res) => {
-            const date = req.query.date || 'May 24, 2022';
-
+            const date = req.query.date;
             const products = await productsCollecetion.find().toArray()
-
-            // step 2 get the availbale booking for specific date
             const query = { date: date }
             const bookings = await bookingCollecetion.find(query).toArray()
-            // step 3 for every each product and find for that product package
+
             products.forEach(product => {
-                const productBookings = bookings.filter(booking => booking.itemPackage === product.name);
-                const bookedPackage = productBookings.map(package => package.product);
-                // product.bookedPackage = productBookings.map(p => p.product)
-                // step 4 whhich products package selected
-                const availableProductPackage = product.products.filter(package => !bookedPackage.includes(package));
-                product.availableProductPackage = availableProductPackage;
+                const productBookings = bookings.filter(book => book.itemPackage === product.name);
+                
+                const bookedProducts = productBookings.map(book =>book.product);
+
+                const available = product.products.filter(product => !bookedProducts.includes(product));
+                product.products = available;
 
             })
             res.send(products)

@@ -34,13 +34,45 @@ async function run() {
             res.send(products);
         })
 
+
+        /// available items
+        app.get('/available', async (req, res) => {
+            const date = req.query.date || 'May 24, 2022';
+
+            const products = await productsCollecetion.find().toArray()
+
+            // step 2 get the availbale booking for specific date
+            const query = { date: date }
+            const bookings = await bookingCollecetion.find(query).toArray()
+            // step 3 for every each product and find for that product package
+            products.forEach(product => {
+                const productBookings = bookings.filter(booking => booking.itemPackage === product.name);
+                const bookedPackage = productBookings.map(package => package.product);
+                // product.bookedPackage = productBookings.map(p => p.product)
+                // step 4 whhich products package selected
+                const availableProductPackage = product.products.filter(package => !bookedPackage.includes(package));
+                product.availableProductPackage = availableProductPackage;
+
+            })
+            res.send(products)
+        })
+
+
+
         // booking for products/items
         app.post('/booking', async (req, res) => {
 
             const booking = req.body;
+            const query = { itemPackage: booking.itemPackage, date: booking.date, buyer: booking.buyer }
+            const exists = await bookingCollecetion.findOne(query);
+
+            if (exists) {
+                return res.send({ success: false, booking: exists })
+            }
+
             const result = await bookingCollecetion.insertOne(booking)
 
-            res.send(result)
+            return res.send({ success: true, result });
         })
 
 

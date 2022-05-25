@@ -61,10 +61,53 @@ async function run() {
 
 
  /// load buyers or users
+
    app.get('/user', verifyjwt, async(req,res)=>{
    const users= await userCollecetion.find().toArray();
    res.send(users)
   })
+
+
+
+/// hide users route without admin 
+app.get('/admin/:email', async(req, res)=>{
+    const email= req.params.email;
+    const user = await userCollecetion.findOne({email:email});
+    const isAdmin = user.role === 'admin';
+    res.send({admin: isAdmin});
+})
+
+
+
+
+
+/// making user an admin/////////////// 
+
+app.put('/user/admin/:email', verifyjwt, async(req,res)=>{
+    const email = req.params.email;
+    const requestUser=req.decoded.email;
+    const requestUserAccount= await userCollecetion.findOne({email:requestUser});
+    if(requestUserAccount.role === 'admin')
+   {
+    const filter ={email: email};
+    const updateDoc={
+        $set: {role: 'admin'},
+    };
+    const result= await userCollecetion.updateOne(filter ,updateDoc)
+   
+    res.send(result)
+   }
+   else{
+       res.status(403).send({message:'forbidden'});
+   }
+})
+
+
+
+
+
+
+
 
 
 
@@ -81,6 +124,10 @@ async function run() {
      const token= jwt.sign({email:email}, process.env.ACCESS_TOKEN_SECRET ,{expiresIn: '1h'})
      res.send({result,token})
  })
+
+
+
+
 
 
 

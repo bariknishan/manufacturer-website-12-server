@@ -19,6 +19,28 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 // console.log(uri)
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
+
+// jwt funtion  verification 
+
+function verifyjwt (req, res , next){
+// console.log('jwt token')
+const authHeader= req.headers.authorization ;
+if(!authHeader){
+    return res.status(401).send({message: 'Unauthorized access'});
+}
+const token = authHeader.split(' ')[1];
+
+jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function(err, decoded) {
+    if(err){
+        return res.status(403).send({message:'forbidden access'})
+    }
+    req.decoded = decoded;
+    next();
+  });
+}
+
+
+
 // databse function start 1st
 async function run() {
     try {
@@ -36,6 +58,15 @@ async function run() {
             const products = await cursor.toArray()
             res.send(products);
         })
+
+
+ /// load buyers or users
+   app.get('/user', verifyjwt, async(req,res)=>{
+   const users= await userCollecetion.find().toArray();
+   res.send(users)
+  })
+
+
 
  //// users 
  app.put('/user/:email', async(req,res)=>{
@@ -77,16 +108,27 @@ async function run() {
 
         // booking showing to dashboard 
 
-        app.get('/booking', async (req, res) => {
+        // app.get('/booking',  async (req, res) => {
+        //     const buyer = req.query.buyer;
+        //     const authorization= req.headers.authorization ;
+        //     console.log('authorization header', authorization);
+        //     const query = { buyer: buyer }
+        //     const bookings=  await bookingCollecetion.find(query).toArray()
+        //     res.send(bookings)
+        // })
+
+        app.get('/booking' ,verifyjwt,  async (req, res) => {
             const buyer = req.query.buyer;
-            const authorization= req.headers.authorization ;
-            console.log('authorization header', authorization);
-            const query = { buyer: buyer }
-            const bookings=  await bookingCollecetion.find(query).toArray()
-            res.send(bookings)
+            const decodedEmail = req.decoded.email ;
+            if( buyer === decodedEmail){
+                const query = { buyer: buyer }
+                const bookings=  await bookingCollecetion.find(query).toArray()
+                res.send(bookings)
+            }
+         else{
+             return res.status(403).send({message:'forbiddden access'})
+         }
         })
-
-
 
 
 
@@ -111,11 +153,6 @@ async function run() {
 
 
 
-
-
-
-
-
     }
     finally {
 
@@ -125,10 +162,10 @@ run().catch(console.dir)
 
 
 
+
 app.get('/', (req, res) => {
     res.send('elctric server is running')
 })
-
 
 // port listen
 app.listen(port, () => {

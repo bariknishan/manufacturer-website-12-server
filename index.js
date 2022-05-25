@@ -1,4 +1,6 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
+
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const cors = require('cors');
 require('dotenv').config();
@@ -24,6 +26,7 @@ async function run() {
         console.log('database connected');
         const productsCollecetion = client.db('electric_manufacturer').collection('products');
         const bookingCollecetion = client.db('electric_manufacturer').collection('bookings');
+        const userCollecetion = client.db('electric_manufacturer').collection('users');
 
 
 
@@ -33,6 +36,23 @@ async function run() {
             const products = await cursor.toArray()
             res.send(products);
         })
+
+ //// users 
+ app.put('/user/:email', async(req,res)=>{
+     const email = req.params.email;
+     const user= req.body ;
+     const filter ={email: email};
+     const options= {upsert: true};
+     const updateDoc={
+         $set: user,
+     };
+     const result= await userCollecetion.updateOne(filter ,updateDoc,options)
+     const token= jwt.sign({email:email}, process.env.ACCESS_TOKEN_SECRET ,{expiresIn: '1h'})
+     res.send({result,token})
+ })
+
+
+
 
 
         /// available items
@@ -59,6 +79,8 @@ async function run() {
 
         app.get('/booking', async (req, res) => {
             const buyer = req.query.buyer;
+            const authorization= req.headers.authorization ;
+            console.log('authorization header', authorization);
             const query = { buyer: buyer }
             const bookings=  await bookingCollecetion.find(query).toArray()
             res.send(bookings)

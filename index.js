@@ -44,8 +44,8 @@ async function run() {
 
             products.forEach(product => {
                 const productBookings = bookings.filter(book => book.itemPackage === product.name);
-                
-                const bookedProducts = productBookings.map(book =>book.product);
+
+                const bookedProducts = productBookings.map(book => book.product);
 
                 const available = product.products.filter(product => !bookedProducts.includes(product));
                 product.products = available;
@@ -53,6 +53,18 @@ async function run() {
             })
             res.send(products)
         })
+
+
+        // booking showing to dashboard 
+
+        app.get('/booking', async (req, res) => {
+            const buyer = req.query.buyer;
+            const query = { buyer: buyer }
+            const bookings=  await bookingCollecetion.find(query).toArray()
+            res.send(bookings)
+        })
+
+
 
 
 

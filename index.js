@@ -49,6 +49,8 @@ async function run() {
         const productsCollecetion = client.db('electric_manufacturer').collection('products');
         const bookingCollecetion = client.db('electric_manufacturer').collection('bookings');
         const userCollecetion = client.db('electric_manufacturer').collection('users');
+        const addProductCollecetion = client.db('electric_manufacturer').collection('addproducts');
+
 
 
 
@@ -195,8 +197,13 @@ app.put('/user/admin/:email', verifyjwt, async(req,res)=>{
             return res.send({ success: true, result });
         })
 
+/// add a product and send it ti database 
 
-
+app.post('/product', async (req, res)=>{
+const product = req.body;
+const result= await addProductCollecetion.insertOne(product);
+res.send(result);
+})
 
 
 

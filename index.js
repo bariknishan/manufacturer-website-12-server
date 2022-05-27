@@ -22,21 +22,21 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 
 // jwt funtion  verification 
 
-function verifyjwt (req, res , next){
-// console.log('jwt token')
-const authHeader= req.headers.authorization ;
-if(!authHeader){
-    return res.status(401).send({message: 'Unauthorized access'});
-}
-const token = authHeader.split(' ')[1];
-
-jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function(err, decoded) {
-    if(err){
-        return res.status(403).send({message:'forbidden access'})
+function verifyjwt(req, res, next) {
+    // console.log('jwt token')
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).send({ message: 'Unauthorized access' });
     }
-    req.decoded = decoded;
-    next();
-  });
+    const token = authHeader.split(' ')[1];
+
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+        if (err) {
+            return res.status(403).send({ message: 'forbidden access' })
+        }
+        req.decoded = decoded;
+        next();
+    });
 }
 
 
@@ -50,82 +50,106 @@ async function run() {
         const bookingCollecetion = client.db('electric_manufacturer').collection('bookings');
         const userCollecetion = client.db('electric_manufacturer').collection('users');
         const addProductCollecetion = client.db('electric_manufacturer').collection('addproducts');
+        const addUsersCollecetion = client.db('electric_manufacturer').collection('addproducts');
+
+
+        //// veiify admin in adding product
+
+        const verifyAdmin = async (req, res ,next) => {
+
+            // const email = req.params.email;
+            const requestUser = req.decoded.email;
+            const requestUserAccount = await userCollecetion.findOne({ email: requestUser });
+            if (requestUserAccount.role === 'admin') {
+                next()
+            }
+            else {
+                res.status(403).send({ message: 'forbidden' })
+            }
+        }
+
 
 
 
 
         app.get('/products', async (req, res) => {
             const query = {};
-            const cursor = productsCollecetion.find(query).project({name: 1});
+            const cursor = productsCollecetion.find(query).project({ name: 1 });
             const products = await cursor.toArray()
             res.send(products);
         })
 
 
- /// load buyers or users
+        /// load buyers or users
 
-   app.get('/user', verifyjwt, async(req,res)=>{
-   const users= await userCollecetion.find().toArray();
-   res.send(users)
-  })
-
-
-
-/// hide users route without admin 
-app.get('/admin/:email', async(req, res)=>{
-    const email= req.params.email;
-    const user = await userCollecetion.findOne({email:email});
-    const isAdmin = user.role === 'admin';
-    res.send({admin: isAdmin});
-})
+        app.get('/user', verifyjwt, async (req, res) => {
+            const users = await userCollecetion.find().toArray();
+            res.send(users)
+        })
 
 
 
+        /// hide users route without admin 
+        app.get('/admin/:email', async (req, res) => {
+            const email = req.params.email;
+            const user = await userCollecetion.findOne({ email: email });
+            const isAdmin = user.role === 'admin';
+            res.send({ admin: isAdmin });
+        })
 
 
-/// making user an admin/////////////// 
 
-app.put('/user/admin/:email', verifyjwt, async(req,res)=>{
+
+
+        /// making user an admin/////////////// 
+
+        app.put('/user/admin/:email', verifyjwt, verifyAdmin, async (req, res) => {
+            const email = req.params.email;
+            // const requestUser = req.decoded.email;
+            // const requestUserAccount = await userCollecetion.findOne({ email: requestUser });
+            if (requestUserAccount.role === 'admin') {
+                const filter = { email: email };
+                const updateDoc = {
+                    $set: { role: 'admin' },
+                };
+                const result = await userCollecetion.updateOne(filter, updateDoc)
+
+                res.send(result)
+            }
+         
+        })
+
+
+
+
+        //// users   
+        app.put('/user/:email', async (req, res) => {
+            const email = req.params.email;
+            const user = req.body;
+            const filter = { email: email };
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: user,
+            };
+            const result = await userCollecetion.updateOne(filter, updateDoc, options)
+            const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+            res.send({ result, token })
+        })
+
+
+
+   //// update    users from my profile  
+   app.put('/users/:email', async (req, res) => {
     const email = req.params.email;
-    const requestUser=req.decoded.email;
-    const requestUserAccount= await userCollecetion.findOne({email:requestUser});
-    if(requestUserAccount.role === 'admin')
-   {
-    const filter ={email: email};
-    const updateDoc={
-        $set: {role: 'admin'},
+    const user = req.body;
+    const updateFilter = { email: email };
+    const options = { upsert: true };
+    const updateDoc = {
+        $set: user,
     };
-    const result= await userCollecetion.updateOne(filter ,updateDoc)
-   
-    res.send(result)
-   }
-   else{
-       res.status(403).send({message:'forbidden'});
-   }
+    const result = await addUsersCollecetion.updateOne(updateFilter, updateDoc, options)
+    res.send( result)
 })
-
-
-
-
-
-
-
-
-
-
- //// users 
- app.put('/user/:email', async(req,res)=>{
-     const email = req.params.email;
-     const user= req.body ;
-     const filter ={email: email};
-     const options= {upsert: true};
-     const updateDoc={
-         $set: user,
-     };
-     const result= await userCollecetion.updateOne(filter ,updateDoc,options)
-     const token= jwt.sign({email:email}, process.env.ACCESS_TOKEN_SECRET ,{expiresIn: '1h'})
-     res.send({result,token})
- })
 
 
 
@@ -155,28 +179,19 @@ app.put('/user/admin/:email', verifyjwt, async(req,res)=>{
         })
 
 
-        // booking showing to dashboard 
+     
 
-        // app.get('/booking',  async (req, res) => {
-        //     const buyer = req.query.buyer;
-        //     const authorization= req.headers.authorization ;
-        //     console.log('authorization header', authorization);
-        //     const query = { buyer: buyer }
-        //     const bookings=  await bookingCollecetion.find(query).toArray()
-        //     res.send(bookings)
-        // })
-
-        app.get('/booking' ,verifyjwt,  async (req, res) => {
+        app.get('/booking', verifyjwt, async (req, res) => {
             const buyer = req.query.buyer;
-            const decodedEmail = req.decoded.email ;
-            if( buyer === decodedEmail){
+            const decodedEmail = req.decoded.email;
+            if (buyer === decodedEmail) {
                 const query = { buyer: buyer }
-                const bookings=  await bookingCollecetion.find(query).toArray()
+                const bookings = await bookingCollecetion.find(query).toArray()
                 res.send(bookings)
             }
-         else{
-             return res.status(403).send({message:'forbiddden access'})
-         }
+            else {
+                return res.status(403).send({ message: 'forbiddden access' })
+            }
         })
 
 
@@ -197,13 +212,33 @@ app.put('/user/admin/:email', verifyjwt, async(req,res)=>{
             return res.send({ success: true, result });
         })
 
-/// add a product and send it ti database 
 
-app.post('/product', async (req, res)=>{
-const product = req.body;
-const result= await addProductCollecetion.insertOne(product);
-res.send(result);
-})
+
+        /// manage product 
+
+        app.get('/product', verifyjwt, verifyAdmin, async (req, res) => {
+
+            const products = await addProductCollecetion.find().toArray();
+            res.send(products);
+        })
+
+
+
+        /// add a product and send it to database 
+
+        app.post('/product', verifyjwt, verifyAdmin, async (req, res) => {
+            const product = req.body;
+            const result = await addProductCollecetion.insertOne(product);
+            res.send(result);
+        })
+
+        //// delet product
+        app.delete('/product/:email', verifyjwt, verifyAdmin, async (req, res) => {
+            const email = req.params.email;
+            const filter ={email: email};
+            const result = await addProductCollecetion.deleteOne(filter);
+            res.send(result);
+        })
 
 
 

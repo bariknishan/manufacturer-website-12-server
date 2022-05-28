@@ -51,6 +51,7 @@ async function run() {
         const userCollecetion = client.db('electric_manufacturer').collection('users');
         const addProductCollecetion = client.db('electric_manufacturer').collection('addproducts');
         const addUsersCollecetion = client.db('electric_manufacturer').collection('addproducts');
+        const paymentCollecetion = client.db('electric_manufacturer').collection('payments');
 
 
         //// veiify admin in adding product
@@ -85,7 +86,7 @@ async function run() {
         res.send({clientSecret: paymentIntent.client_secret})
         });
 
-        
+
         //////// product api 
         app.get('/products', async (req, res) => {
             const query = {};
@@ -221,13 +222,24 @@ async function run() {
         })
 
 
-        ////
+        //// paymnent update 
+  app.patch('/booking/:id' ,verifyjwt, async (req,res)=>{
+      const id = req.params.id ;
+      const payment = req.body ;
 
+      const filter = { _id: ObjectId(id) };
+      const updatedDoc={
+          $set:{
+              paid:true ,
+              transactionId: payment.transactionId,
+          }
+      }
 
-
-
-
-
+      const  result = await paymentCollecetion.insertOne(payment)
+      const updatedBooking= await bookingCollecetion.updateOne(filter ,updatedDoc);
+      res.send(updatedDoc)
+       
+  })
 
 
         // booking for products/items

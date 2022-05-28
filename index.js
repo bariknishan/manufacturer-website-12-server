@@ -6,7 +6,7 @@ const cors = require('cors');
 require('dotenv').config();
 const port = process.env.PORT || 5000;
 const app = express();
-
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); /// payment 
 
 
 /// middlrware 
@@ -55,7 +55,7 @@ async function run() {
 
         //// veiify admin in adding product
 
-        const verifyAdmin = async (req, res ,next) => {
+        const verifyAdmin = async (req, res, next) => {
 
             // const email = req.params.email;
             const requestUser = req.decoded.email;
@@ -70,8 +70,23 @@ async function run() {
 
 
 
+        //////// payment api///////////////////// 
+        app.post('/create-payment-intent', verifyjwt, async (req, res) => {
 
+            const products = req.body;
+            const price = products.price;
+            const amount = price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card']
 
+            })
+        res.send({clientSecret: paymentIntent.client_secret})
+        });
+
+        
+        //////// product api 
         app.get('/products', async (req, res) => {
             const query = {};
             const cursor = productsCollecetion.find(query).project({ name: 1 });
@@ -116,7 +131,7 @@ async function run() {
 
                 res.send(result)
             }
-         
+
         })
 
 
@@ -138,18 +153,18 @@ async function run() {
 
 
 
-   //// update    users from my profile  
-   app.put('/users/:email', async (req, res) => {
-    const email = req.params.email;
-    const user = req.body;
-    const updateFilter = { email: email };
-    const options = { upsert: true };
-    const updateDoc = {
-        $set: user,
-    };
-    const result = await addUsersCollecetion.updateOne(updateFilter, updateDoc, options)
-    res.send( result)
-})
+        //// update    users from my profile  
+        app.put('/users/:email', async (req, res) => {
+            const email = req.params.email;
+            const user = req.body;
+            const updateFilter = { email: email };
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: user,
+            };
+            const result = await addUsersCollecetion.updateOne(updateFilter, updateDoc, options)
+            res.send(result)
+        })
 
 
 
@@ -179,7 +194,7 @@ async function run() {
         })
 
 
-     
+
 
         app.get('/booking', verifyjwt, async (req, res) => {
             const buyer = req.query.buyer;
@@ -196,17 +211,17 @@ async function run() {
 
 
 
-      //////// payment booking for order
+        //////// payment booking for order
 
-app.get('/booking/:id',verifyjwt, async (req,res)=>{
-    const id= req.params.id ;
-    const query= {_id:ObjectId(id)};
-    const booking= await bookingCollecetion.findOne(query);
-    res.send(booking);
-})
+        app.get('/booking/:id', verifyjwt, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const booking = await bookingCollecetion.findOne(query);
+            res.send(booking);
+        })
 
 
-
+        ////
 
 
 
@@ -254,7 +269,7 @@ app.get('/booking/:id',verifyjwt, async (req,res)=>{
         //// delet product
         app.delete('/product/:email', verifyjwt, verifyAdmin, async (req, res) => {
             const email = req.params.email;
-            const filter ={email: email};
+            const filter = { email: email };
             const result = await addProductCollecetion.deleteOne(filter);
             res.send(result);
         })
